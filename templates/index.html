@@ -50,6 +50,62 @@
                     </div>
                 </div>
 
+                <div class="sun-timeline">
+                    <h3>Sunrise & Sunset</h3>
+                    <div class="timeline-bar">
+                        <div class="timeline-fill" id="sun-fill"></div>
+                        <div class="sun-dot" id="sun-dot"></div>
+                    </div>
+                    <div class="timeline-labels">
+                        <span id="sunrise-label">🌅 --:--</span>
+                        <span id="sunset-label">🌇 --:--</span>
+                    </div>
+                </div>
+
+                {% if aqi %}
+                <div class="aqi-card">
+                    <h3>Air Quality Index</h3>
+                    <div class="aqi-main">
+                        <span class="aqi-number" style="color: {{ aqi.color }}">{{ aqi.aqi }}</span>
+                        <span class="aqi-label" style="color: {{ aqi.color }}">{{ aqi.label }}</span>
+                    </div>
+
+                    <div class="aqi-bar-container">
+                        <div class="aqi-bar-track">
+                            <div class="aqi-bar-fill" style="width: {{ aqi.percent }}%; background: {{ aqi.color }};"></div>
+                            <div class="aqi-bar-dot" style="left: {{ aqi.percent }}%;"></div>
+                        </div>
+                        <div class="aqi-bar-labels">
+                            <span>Good<br>0</span>
+                            <span>Moderate<br>50</span>
+                            <span>Poor<br>100</span>
+                            <span>Unhealthy<br>150</span>
+                            <span>Severe<br>200</span>
+                            <span>Hazardous<br>301+</span>
+                        </div>
+                    </div>
+
+                    <div class="aqi-grid">
+                        <div class="aqi-item">
+                            <span class="aqi-item-label">PM2.5</span>
+                            <span>{{ aqi.pm25 }} μg/m³</span>
+                        </div>
+                        <div class="aqi-item">
+                            <span class="aqi-item-label">PM10</span>
+                            <span>{{ aqi.pm10 }} μg/m³</span>
+                        </div>
+                        <div class="aqi-item">
+                            <span class="aqi-item-label">NO₂</span>
+                            <span>{{ aqi.no2 }} μg/m³</span>
+                        </div>
+                        <div class="aqi-item">
+                            <span class="aqi-item-label">O₃</span>
+                            <span>{{ aqi.o3 }} μg/m³</span>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
                 {% if forecast %}
                 <div class="forecast">
                     <h3>5-Day Forecast</h3>
@@ -139,6 +195,33 @@
                 btn.disabled = false;
             });
         }
+
+        {% if weather %}
+        (function() {
+            const sunrise = {{ weather.sunrise }};
+            const sunset = {{ weather.sunset }};
+            const current = {{ weather.current_time }};
+            const offset = {{ weather.timezone_offset }};
+
+            function toLocalHHMM(ts) {
+                const d = new Date((ts + offset) * 1000);
+                const h = Math.floor((d.getUTCHours()));
+                const m = d.getUTCMinutes().toString().padStart(2, '0');
+                const ampm = h >= 12 ? 'PM' : 'AM';
+                return `${h % 12 || 12}:${m} ${ampm}`;
+            }
+
+            document.getElementById('sunrise-label').textContent = '🌅 ' + toLocalHHMM(sunrise);
+            document.getElementById('sunset-label').textContent = '🌇 ' + toLocalHHMM(sunset);
+
+            const totalDay = sunset - sunrise;
+            const elapsed = Math.min(Math.max(current - sunrise, 0), totalDay);
+            const percent = (elapsed / totalDay) * 100;
+
+            document.getElementById('sun-fill').style.width = percent + '%';
+            document.getElementById('sun-dot').style.left = percent + '%';
+        })();
+        {% endif %}
     </script>
 </body>
 </html>
