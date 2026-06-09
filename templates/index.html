@@ -6,6 +6,8 @@
     <title>Weather App</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 </head>
 <body class="{{ weather.time_of_day if weather else 'sunny' }}">
     <div class="container">
@@ -127,29 +129,37 @@
 
             </div>
         {% endif %}
+
+        <div class="map-section">
+            <h3>🌍 World Weather Map</h3>
+            <div id="weather-map">
+                <div class="map-loading" id="map-loading">⏳ Loading weather data...</div>
+            </div>
+        </div>
+
     </div>
 
     <script>
         const lottieMap = {
-    "01d": "/static/lottie/clear-day.json",
-    "01n": "/static/lottie/clear-night.json",
-    "02d": "/static/lottie/partly-cloudy-day.json",
-    "02n": "/static/lottie/partly-cloudy-night.json",
-    "03d": "/static/lottie/cloudy.json",
-    "03n": "/static/lottie/cloudy.json",
-    "04d": "/static/lottie/overcast.json",
-    "04n": "/static/lottie/overcast-night.json",
-    "09d": "/static/lottie/drizzle.json",
-    "09n": "/static/lottie/drizzle.json",
-    "10d": "/static/lottie/rain.json",
-    "10n": "/static/lottie/rain.json",
-    "11d": "/static/lottie/thunderstorms-day.json",
-    "11n": "/static/lottie/thunderstorms-night.json",
-    "13d": "/static/lottie/snow.json",
-    "13n": "/static/lottie/snow.json",
-    "50d": "/static/lottie/fog-day.json",
-    "50n": "/static/lottie/fog-night.json",
-};
+            "01d": "/static/lottie/clear-day.json",
+            "01n": "/static/lottie/clear-night.json",
+            "02d": "/static/lottie/partly-cloudy-day.json",
+            "02n": "/static/lottie/partly-cloudy-night.json",
+            "03d": "/static/lottie/cloudy.json",
+            "03n": "/static/lottie/cloudy.json",
+            "04d": "/static/lottie/overcast.json",
+            "04n": "/static/lottie/overcast-night.json",
+            "09d": "/static/lottie/drizzle.json",
+            "09n": "/static/lottie/drizzle.json",
+            "10d": "/static/lottie/rain.json",
+            "10n": "/static/lottie/rain.json",
+            "11d": "/static/lottie/thunderstorms-day.json",
+            "11n": "/static/lottie/thunderstorms-night.json",
+            "13d": "/static/lottie/snow.json",
+            "13n": "/static/lottie/snow.json",
+            "50d": "/static/lottie/fog-day.json",
+            "50n": "/static/lottie/fog-night.json",
+        };
 
         function loadLottie(containerId, iconCode) {
             const url = lottieMap[iconCode] || lottieMap["01d"];
@@ -205,7 +215,7 @@
 
             function toLocalHHMM(ts) {
                 const d = new Date((ts + offset) * 1000);
-                const h = Math.floor((d.getUTCHours()));
+                const h = d.getUTCHours();
                 const m = d.getUTCMinutes().toString().padStart(2, '0');
                 const ampm = h >= 12 ? 'PM' : 'AM';
                 return `${h % 12 || 12}:${m} ${ampm}`;
@@ -222,6 +232,45 @@
             document.getElementById('sun-dot').style.left = percent + '%';
         })();
         {% endif %}
+
+        // Map — always initialised, visible on homepage
+        (function() {
+            const map = L.map('weather-map', { zoomControl: true }).setView([20, 10], 2);
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap &copy; CARTO',
+                subdomains: 'abcd',
+                maxZoom: 10
+            }).addTo(map);
+
+            fetch('/map-weather')
+                .then(res => res.json())
+                .then(cities => {
+                    cities.forEach(c => {
+                        const iconUrl = `https://openweathermap.org/img/wn/${c.icon}.png`;
+                        const html = `
+                            <div class="map-marker">
+                                <img src="${iconUrl}" width="32" height="32">
+                                <div class="map-marker-label">${c.temp}°</div>
+                            </div>`;
+                        const icon = L.divIcon({ html, className: '', iconAnchor: [20, 20] });
+                        const marker = L.marker([c.lat, c.lon], { icon }).addTo(map);
+                        marker.bindPopup(`
+                            <strong>${c.city}</strong><br>
+                            ${c.temp}°C &bull; ${c.description}
+                        `);
+                    });
+                });
+        })();
+
+        fetch('/map-weather')
+            .then(res => res.json())
+            .then(cities => {
+                document.getElementById('map-loading').style.display = 'none';
+                cities.forEach(c => {
+                    // ... rest of marker code
+                });
+            });
     </script>
 </body>
 </html>

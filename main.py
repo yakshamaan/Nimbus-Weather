@@ -5,6 +5,7 @@ from flask import Flask, render_template, request, jsonify
 from dotenv import load_dotenv
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 load_dotenv()
 
@@ -55,7 +56,7 @@ def get_current_weather(city):
         "feels_like": round(data["main"]["feels_like"]),
         "humidity": data["main"]["humidity"],
         "pressure": data["main"]["pressure"],
-        "wind": data["wind"]["speed"],
+        "wind": round(data["wind"]["speed"], 1),
         "description": data["weather"][0]["description"].capitalize(),
         "icon": data["weather"][0]["icon"],
         "time_of_day": get_time_of_day(data["dt"], data["timezone"]),
@@ -90,8 +91,8 @@ def get_forecast(city):
             "date": datetime.strptime(date, "%Y-%m-%d").strftime("%a, %b %d"),
             "min": round(min(temps)),
             "max": round(max(temps)),
-            "icon": icons[len(icons)//2],
-            "description": descriptions[len(descriptions)//2].capitalize(),
+            "icon": icons[len(icons) // 2],
+            "description": descriptions[len(descriptions) // 2].capitalize(),
         })
     return forecast
 
@@ -101,17 +102,16 @@ def get_air_quality(lat, lon):
     data = response.json()
     if response.status_code != 200:
         return None
-    
+
     components = data["list"][0]["components"]
     pm25 = components["pm2_5"]
 
-    # Convert PM2.5 to US AQI
     def pm25_to_aqi(pm):
         breakpoints = [
-            (0, 12.0, 0, 50),
-            (12.1, 35.4, 51, 100),
-            (35.5, 55.4, 101, 150),
-            (55.5, 150.4, 151, 200),
+            (0,     12.0,  0,   50),
+            (12.1,  35.4,  51,  100),
+            (35.5,  55.4,  101, 150),
+            (55.5,  150.4, 151, 200),
             (150.5, 250.4, 201, 300),
             (250.5, 500.4, 301, 500),
         ]
@@ -145,6 +145,23 @@ def get_air_quality(lat, lon):
         "no2": round(components["no2"], 1),
         "o3": round(components["o3"], 1),
     }
+
+def fetch_city(city):
+    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={API_KEY}&units=metric"
+    try:
+        response = requests.get(url, timeout=6)
+        data = response.json()
+        if response.status_code == 200:
+            return {
+                "city": data["name"],
+                "lat": data["coord"]["lat"],
+                "lon": data["coord"]["lon"],
+                "temp": round(data["main"]["temp"]),
+                "description": data["weather"][0]["description"].capitalize(),
+                "icon": data["weather"][0]["icon"],
+            }
+    except Exception:
+        return None
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -186,6 +203,22 @@ def weather_by_coords():
 
     return jsonify({"city": data["name"]})
 
+@app.route("/map-weather")
+def map_weather():
+    cities = [
+        "London", "New York", "Tokyo", "Paris", "Sydney",
+        "Dubai", "Moscow", "Beijing", "Mumbai", "Delhi", "Hyderabad", "Cairo",
+        "Toronto", "Berlin", "Singapore", "Lagos", "Sao Paulo",
+        "Mexico City", "Jakarta", "Bangkok", "Seoul", "Nairobi"
+    ]
+    results = []
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = [executor.submit(fetch_city, city) for city in cities]
+        for future in as_completed(futures):
+            result = future.result()
+            if result:
+                results.append(result)
+    return jsonify(results)
 
 if __name__ == "__main__":
     app.run(debug=os.getenv("FLASK_DEBUG", "false").lower() == "true")
