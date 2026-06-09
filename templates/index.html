@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather App</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
+</head>
+<body class="{{ weather.time_of_day if weather else 'sunny' }}">
+    <div class="container">
+        <h1>🌤 Weather App</h1>
+
+        <form method="POST">
+            <input type="text" name="city" placeholder="Enter city name....E.g. rome, italy" autofocus>
+            <button type="submit">Search</button>
+        </form>
+
+        <button type="button" id="detect-btn" onclick="detectLocation()">📍 Detect my location</button>
+
+        {% if error %}
+            <div class="error">{{ error }}</div>
+        {% endif %}
+
+        {% if weather %}
+            <div class="card">
+                <div class="city-name">{{ weather.city }}, {{ weather.country }}</div>
+
+                <div id="main-icon" style="width:120px;height:120px;margin:0 auto;"></div>
+
+                <div class="temp">{{ weather.temp }}°C</div>
+                <div class="description">{{ weather.description }}</div>
+
+                <div class="details">
+                    <div class="detail">
+                        <span class="label">Feels like</span>
+                        <span>{{ weather.feels_like }}°C</span>
+                    </div>
+                    <div class="detail">
+                        <span class="label">Humidity</span>
+                        <span>{{ weather.humidity }}%</span>
+                    </div>
+                    <div class="detail">
+                        <span class="label">Pressure</span>
+                        <span>{{ weather.pressure }} hPa</span>
+                    </div>
+                    <div class="detail">
+                        <span class="label">Wind</span>
+                        <span>{{ weather.wind }} m/s</span>
+                    </div>
+                </div>
+
+                {% if forecast %}
+                <div class="forecast">
+                    <h3>5-Day Forecast</h3>
+                    <div class="forecast-grid">
+                        {% for day in forecast %}
+                        <div class="forecast-card">
+                            <div class="forecast-date">{{ day.date }}</div>
+                            <div id="icon-{{ loop.index }}" style="width:60px;height:60px;margin:0 auto;"></div>
+                            <div class="forecast-desc">{{ day.description }}</div>
+                            <div class="forecast-temps">
+                                <span class="max">{{ day.max }}°</span>
+                                <span class="min">{{ day.min }}°</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+            </div>
+        {% endif %}
+    </div>
+
+    <script>
+        const lottieMap = {
+    "01d": "/static/lottie/clear-day.json",
+    "01n": "/static/lottie/clear-night.json",
+    "02d": "/static/lottie/partly-cloudy-day.json",
+    "02n": "/static/lottie/partly-cloudy-night.json",
+    "03d": "/static/lottie/cloudy.json",
+    "03n": "/static/lottie/cloudy.json",
+    "04d": "/static/lottie/overcast.json",
+    "04n": "/static/lottie/overcast-night.json",
+    "09d": "/static/lottie/drizzle.json",
+    "09n": "/static/lottie/drizzle.json",
+    "10d": "/static/lottie/rain.json",
+    "10n": "/static/lottie/rain.json",
+    "11d": "/static/lottie/thunderstorms-day.json",
+    "11n": "/static/lottie/thunderstorms-night.json",
+    "13d": "/static/lottie/snow.json",
+    "13n": "/static/lottie/snow.json",
+    "50d": "/static/lottie/fog-day.json",
+    "50n": "/static/lottie/fog-night.json",
+};
+
+        function loadLottie(containerId, iconCode) {
+            const url = lottieMap[iconCode] || lottieMap["01d"];
+            lottie.loadAnimation({
+                container: document.getElementById(containerId),
+                renderer: 'svg',
+                loop: true,
+                autoplay: true,
+                path: url
+            });
+        }
+
+        {% if weather %}
+        loadLottie('main-icon', '{{ weather.icon }}');
+        {% endif %}
+        {% for day in forecast %}
+        loadLottie('icon-{{ loop.index }}', '{{ day.icon }}');
+        {% endfor %}
+
+        function detectLocation() {
+            const btn = document.getElementById('detect-btn');
+            btn.textContent = '📍 Detecting...';
+            btn.disabled = true;
+
+            if (!navigator.geolocation) {
+                alert('Geolocation is not supported by your browser.');
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(function(position) {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+
+                fetch(`/weather-by-coords?lat=${lat}&lon=${lon}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        document.querySelector('input[name="city"]').value = data.city;
+                        document.querySelector('form').submit();
+                    });
+            }, function() {
+                alert('Unable to get your location. Please allow location access.');
+                btn.textContent = '📍 Detect my location';
+                btn.disabled = false;
+            });
+        }
+    </script>
+</body>
+</html>
